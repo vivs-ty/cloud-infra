@@ -6,18 +6,18 @@ This repository provisions a small AWS footprint with Terraform. The live Terraf
 
 ```text
 cloud-infra/
-├── environments/
-│   ├── dev/
-│   ├── staging/
-│   └── prod/
-├── scripts/
-└── src/
-    ├── backend.tf
-    ├── main.tf
-    ├── outputs.tf
-    ├── provider.tf
-    ├── variables.tf
-    └── modules/
+|- environments/
+|  |- dev/
+|  |- staging/
+|  `- prod/
+|- scripts/
+`- src/
+   |- backend.tf
+   |- main.tf
+   |- outputs.tf
+   |- provider.tf
+   |- variables.tf
+   `- modules/
 ```
 
 ## What It Creates
@@ -105,4 +105,3 @@ Re-check formatting and validation:
 terraform -chdir=src fmt -check -recursive
 terraform -chdir=src validate
 ```
-
