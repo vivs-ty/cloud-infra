@@ -1,8 +1,6 @@
 terraform {
   backend "s3" {
-    versioning {
-      enabled = true
-    }
+    encrypt        = true
     dynamodb_table = "terraform-locks"
   }
 }

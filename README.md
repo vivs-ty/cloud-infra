@@ -1,252 +1,110 @@
-# Cloud Infrastructure Project
+# Cloud Infrastructure
 
-This project is designed to provision and manage cloud infrastructure using Terraform. It includes a modular structure to facilitate organization and reusability of code.
+This repository provisions a small AWS footprint with Terraform. The live Terraform root is `src`, environment-specific values live under `environments`, and the helper scripts wrap Terraform with the correct paths.
 
-## Project Structure
+## Layout
 
+```text
+cloud-infra/
+├── environments/
+│   ├── dev/
+│   ├── staging/
+│   └── prod/
+├── scripts/
+└── src/
+    ├── backend.tf
+    ├── main.tf
+    ├── outputs.tf
+    ├── provider.tf
+    ├── variables.tf
+    └── modules/
 ```
-cloud-infra-project
-├── src
-│   ├── main.tf                # Root configuration
-│   ├── variables.tf           # Root variables
-│   ├── outputs.tf             # Root outputs
-│   ├── providers.tf           # Provider configurations
-│   ├── backend.tf             # State management
-│   └── modules
-│       ├── networking         # VPC, Subnets, NAT Gateway
-│       ├── security          # Security Groups, KMS Keys
-│       ├── compute           # EC2, Auto Scaling Groups
-│       └── storage           # S3 Buckets, Encryption
-├── environments
-│   ├── dev
-│   │   ├──terraform.tfvars
-│   │   └──  backend.tfvars
-│   ├── staging
-│   │   ├──terraform.tfvars
-│   │   └──  backend.tfvars
-│   └── prod
-│       ├──terraform.tfvars
-│       └──  backend.tfvars
-├──  backend.tfvars
-├── scripts
-│   ├── deploy.sh             # Deployment script
-│   └── cleanup.sh            # Resource cleanup script
-├── .github
-│   ├── workflows
-│   │   ├── terraform.yml     # Main CI/CD workflow
-│   │   └── cleanup.yml       # Cleanup workflow
-│   ├── CODEOWNERS            # Code review assignments
-│   └── pull_request_template.md
-├── .gitignore
-└── README.md
-```
+
+## What It Creates
+
+- A VPC with public and private subnets.
+- A security group for the EC2 instance.
+- An EC2 instance using the latest Amazon Linux 2023 AMI available in the selected region.
+- An S3 bucket for application storage with versioning, server-side encryption, and public access blocking enabled.
 
 ## Prerequisites
 
-- AWS CLI configured with appropriate credentials
-- Terraform >= 1.0.0
-- Git
-- Bash shell (Git Bash for Windows)
+- Terraform 1.5 or newer.
+- AWS CLI configured with credentials that can manage the target resources.
+- An existing S3 bucket and DynamoDB table for remote Terraform state, referenced by `environments/<env>/backend.tfvars`.
+- Bash. On Windows, Git Bash is the simplest option.
 
+## Deploy With Scripts
 
-## Setup Instructions
+From the repository root:
 
-1. **Clone the Repository**
-   ```powershell
-   git clone https://github.com/574n13y/cloud-infra.git
-   cd cloud-infra
-   ```
-
-2. **Configure AWS Credentials**
-   ```powershell
-   aws configure
-   ```
-
-3. **Select Environment**
-   ```powershell
-   terraform workspace new dev  # or staging/prod
-   ```
-
-4. **Initialize Infrastructure**
-   ```powershell
-   terraform init -backend-config="environments/dev/backend.tfvars"
-   ```
-
-5. **Validate Configuration**
-   ```powershell
-   terraform validate
-   terraform fmt -recursive
-   terraform plan -var-file="environments/dev/terraform.tfvars"
-   ```
-
-6. **Deploy Infrastructure**
-   ```powershell
-   terraform apply -var-file="environments/dev/terraform.tfvars"
-   ```
-   
-## Environment-specific Deployments
 ```bash
-# For dev environment
-terraform workspace select dev
-terraform plan -var-file="environments/dev/terraform.tfvars"
-
-# For production
-terraform workspace select prod
-terraform plan -var-file="environments/prod/terraform.tfvars"
+./scripts/deploy.sh -e dev
+./scripts/deploy.sh -e staging -p
+./scripts/deploy.sh -e prod -f
 ```
 
-## Features
+Destroy an environment:
 
-- **Networking Module**: VPC with public/private subnets, NAT Gateways
-- **Security Module**: Preconfigured security groups, KMS encryption
-- **Compute Module**: Auto Scaling Groups, Launch Templates
-- **Storage Module**: S3 buckets with versioning and encryption
-
-
-## Security Features
-- VPC with private/public subnet separation
-- Security groups with least privilege access
-- KMS encryption for sensitive data
-- S3 bucket versioning and encryption
-- State file encryption and locking
-
-
-## Security Best Practices
-1. Use KMS encryption for sensitive data
-2. Implement least privilege access
-3. Enable versioning for S3 buckets
-4. Use private subnets for sensitive resources
-5. Implement proper tagging strategy
-
-## Module Usage
-
-### Networking Module
-```hcl
-module "networking" {
-  source = "./modules/networking"
-  vpc_cidr = "10.0.0.0/16"
-  environment = "dev"
-}
+```bash
+./scripts/cleanup.sh -e dev
+./scripts/cleanup.sh -e prod -f
 ```
 
-### Security Module
-```hcl
-module "security" {
-  source = "./modules/security"
-  vpc_id = module.networking.vpc_id
-  environment = "dev"
-}
+`create.sh` is a thin wrapper around `deploy.sh`:
+
+```bash
+./scripts/create.sh dev
+./scripts/create.sh staging --plan
 ```
 
-## Monitoring and Maintenance
-- Regular security updates
-- Resource tagging for cost allocation
-- State file backups
-- Infrastructure documentation
+## Run Terraform Manually
 
-...existing code...
-## CI/CD Pipeline
+All Terraform commands should target the `src` directory.
 
-### Workflows
+```bash
+terraform -chdir=src init -backend-config=../environments/dev/backend.tfvars
+terraform -chdir=src workspace select dev || terraform -chdir=src workspace new dev
+terraform -chdir=src validate
+terraform -chdir=src fmt -recursive
+terraform -chdir=src plan -var-file=../environments/dev/terraform.tfvars
+terraform -chdir=src apply -var-file=../environments/dev/terraform.tfvars
+```
 
-1. **Terraform CI/CD**
-   - Validates Terraform configurations
-   - Plans infrastructure changes
-   - Applies changes to environments
-   
-2. **Terraform Cleanup**
-   - Manual workflow for infrastructure cleanup
-   - Environment-specific destruction
+## Environment Variables
 
-### Pipeline Stages
+Each `environments/<env>/terraform.tfvars` file now defines:
 
-1. **Validate**
-   - Code formatting check
-   - Terraform validation
-   - Security scanning
+- `aws_region`
+- `vpc_cidr`
+- `public_subnet_cidrs`
+- `private_subnet_cidrs`
+- `instance_type`
+- `bucket_name_prefix`
+- `ssh_ingress_cidrs`
 
-2. **Plan**
-   - Infrastructure planning
-   - Cost estimation
-   - Plan artifact creation
+`bucket_name_prefix` is a prefix, not a full name. Terraform uses it to create a stable, globally unique bucket name on first apply.
 
-3. **Apply**
-   - Environment-specific deployment
-   - Post-deployment verification
-   - Documentation updates
+## Notes
 
-## Security Best Practices
-
-1. **Infrastructure Security**
-   - VPC with private/public subnet isolation
-   - Security groups with least privilege access
-   - KMS encryption for sensitive data
-   - State file encryption and locking
-     
-2. **CI/CD Security**
-   - Credentials stored in GitHub Secrets
-   - Environment-specific approvals
-   - Branch protection rules
-   - Regular security scanning
-
-3. **Monitoring**
-   - CloudWatch monitoring enabled
-   - AWS Config rules
-   - Resource tagging for tracking
+- Review `ssh_ingress_cidrs` before using this outside a test environment. The sample values currently allow SSH from anywhere.
+- The backend state bucket is separate from the application storage bucket created by this stack.
+- The root-level `terraform.tfvars` file is only a reference example. The deployment scripts use the environment-specific tfvars under `environments/`.
 
 ## Troubleshooting
 
-1. **State Lock Issues**
-   ```powershell
-   terraform force-unlock <LOCK_ID>
-   ```
+State lock issue:
 
-2. **Plan Verification**
-   ```powershell
-   terraform show
-   terraform plan -out=tfplan
-   ```
-3. **Common Issues**
-   - Backend configuration errors
-   - AWS credential issues
-   - Resource conflicts
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-   ```powershell
-   git checkout -b feature/your-feature
-   ```
-3. Make changes and test
-4. Submit PR with detailed description
-
-## Scripts
-
-### Deploy Script
-```powershell
-./scripts/deploy.sh -e dev            # Deploy to dev
-./scripts/deploy.sh -e dev -p         # Plan only
-./scripts/deploy.sh -e prod -f        # Force deploy
+```bash
+terraform -chdir=src force-unlock <LOCK_ID>
 ```
 
-### Cleanup Script
-```powershell
-./scripts/cleanup.sh -e dev           # Cleanup dev
-./scripts/cleanup.sh -e prod -f       # Force cleanup
+Re-check formatting and validation:
+
+```bash
+terraform -chdir=src fmt -check -recursive
+terraform -chdir=src validate
 ```
-
-## License
-
-MIT License - See LICENSE file
-
-## Support
-
-- Open an issue for bugs
-- Submit PR for improvements
-- Contact maintainers for critical issues
-
-## Authors
 ```
 - Stanley - [@574n13y](https://github.com/574n13y)
 ```

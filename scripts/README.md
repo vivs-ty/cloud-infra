@@ -1,40 +1,35 @@
-# Usage Instructions:
+# Script Usage
 
-1. Basic Deployment:
-   ```
-   ./scripts/deploy.sh -e dev
+The scripts resolve the repository paths themselves and always run Terraform from the `src` directory.
 
-   ./scripts/cleanup.sh -e dev
-   ```
-2. Plan Only (No Apply):
-   ```
-    ./scripts/deploy.sh -e dev -p
-   
-   ./scripts/cleanup.sh -e dev -f
-   ```
-4. Force Deploy (No Confirmation): ``` ./scripts/deploy.sh -e prod -f ```
+Basic deployment:
 
+```bash
+./scripts/deploy.sh -e dev
+```
 
-### Features:
+Plan only:
 
- - Environment validation
-- AWS credentials check
-- Terraform workspace management
-- Format and validation checks
-- Production deployment safeguards
-- Colored output for better visibility
-- Error handling and logging
-- Plan file cleanup
+```bash
+./scripts/deploy.sh -e staging -p
+./scripts/create.sh staging --plan
+```
 
-### Windows Setup:
-    ```
-    # Add execution permission
-    icacls "scripts\deploy.sh" /grant Everyone:RX
-    ```
+Force production apply:
 
-### Remember to:
+```bash
+./scripts/deploy.sh -e prod -f
+```
 
-- Test in lower environments first
-- Review the plan output carefully
-- Ensure AWS credentials are properly configured
-- Keep the state files backed up
+Cleanup:
+
+```bash
+./scripts/cleanup.sh -e dev
+./scripts/cleanup.sh -e prod -f
+```
+
+Requirements:
+
+- AWS CLI credentials must already be configured.
+- The remote state bucket and DynamoDB lock table referenced by `environments/<env>/backend.tfvars` must already exist.
+- Review `ssh_ingress_cidrs` in each environment tfvars before deploying outside a test environment.
