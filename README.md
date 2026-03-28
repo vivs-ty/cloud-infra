@@ -105,13 +105,4 @@ Re-check formatting and validation:
 terraform -chdir=src fmt -check -recursive
 terraform -chdir=src validate
 ```
-```
-- Stanley - [@574n13y](https://github.com/574n13y)
-```
-
-## Usage Guidelines
-
-- Use the `src/modules/example-module` directory to create reusable modules for your infrastructure components.
-- Customize the input variables in `variables.tf` and `terraform.tfvars` as needed for your environment.
-- Review the output values defined in `outputs.tf` to understand the resources created after applying the configuration.
 
