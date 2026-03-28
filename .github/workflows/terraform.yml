@@ -3,56 +3,131 @@ name: Terraform
 on:
   push:
     branches:
-      - features/fix-issues/workflow/secure
+      - main
+    paths:
+      - ".github/workflows/terraform.yml"
+      - "environments/**"
+      - "src/**"
   pull_request:
+    paths:
+      - ".github/workflows/terraform.yml"
+      - "environments/**"
+      - "src/**"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to plan or apply
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      apply:
+        description: Apply the planned changes
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  TF_WORKING_DIR: src
+  AWS_REGION: us-east-1
 
 jobs:
-  terraform:
-    name: Terraform
+  validate:
+    name: Validate
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: latest
+          terraform_version: 1.8.2
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1 # Change to your preferred region
-
-      - name: List files in environments/dev/
-        run: ls -l environments/dev/
-        working-directory: .
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+        working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform Init
-        run: terraform init -backend-config="src/backend.tf"
-        working-directory: .
+        run: terraform init -backend=false -input=false
+        working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform Validate
         run: terraform validate
-        working-directory: .
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+  plan:
+    name: Plan
+    if: github.event_name == 'workflow_dispatch'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.2
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init -input=false -backend-config="../environments/${{ github.event.inputs.environment }}/backend.tfvars"
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Select or create workspace
+        run: terraform workspace select "${{ github.event.inputs.environment }}" || terraform workspace new "${{ github.event.inputs.environment }}"
+        working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform Plan
-        run: terraform plan -var-file="src/backend.tf"
-        working-directory: .
+        run: terraform plan -input=false -var-file="../environments/${{ github.event.inputs.environment }}/terraform.tfvars"
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+  apply:
+    name: Apply
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.apply == 'true'
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.2
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init -input=false -backend-config="../environments/${{ github.event.inputs.environment }}/backend.tfvars"
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Select or create workspace
+        run: terraform workspace select "${{ github.event.inputs.environment }}" || terraform workspace new "${{ github.event.inputs.environment }}"
+        working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/features/fix-issues/workflow/secure' && github.event_name == 'push'
-        run: terraform apply -auto-approve -var-file="src/backend.tf"
-        working-directory: .
-
-      - name: Post Configure AWS Credentials
-        run: echo "AWS credentials configured"
-
-      - name: Post Checkout code
-        run: echo "Code checked out"
-
-      - name: Complete job
-        run: echo "Terraform job complete"
+        run: terraform apply -auto-approve -input=false -var-file="../environments/${{ github.event.inputs.environment }}/terraform.tfvars"
+        working-directory: ${{ env.TF_WORKING_DIR }}
