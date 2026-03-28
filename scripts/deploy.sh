@@ -102,4 +102,3 @@ if [[ $PLAN_ONLY != true ]]; then
     log "Terraform outputs:"
     terraform -chdir="${TERRAFORM_DIR}" output
 fi
-# Execute deployment with error handling

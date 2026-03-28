@@ -59,7 +59,6 @@ if [[ $ENVIRONMENT == "prod" && $FORCE != true ]]; then
 fi
 
 cleanup() {
-cleanup() {
     log "Starting cleanup for ${ENVIRONMENT} environment..."
 
     log "Initializing Terraform..."
